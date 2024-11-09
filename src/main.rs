@@ -83,11 +83,7 @@ impl App {
                         stats,
                     }
                 } else {
-                    // FIXME player select
                     Screen::PlayerSelect
-                    // Screen::Simulation {
-                    //     simulation: Simulation::new(this.roster.first().unwrap().clone()),
-                    // }
                 };
             }
             Some(Err(err)) => anyhow::bail!(err),
@@ -559,8 +555,6 @@ impl<'a> PlayerCreation<'a> {
     }
 
     fn show_navigation(&mut self, ui: &Ui) {
-        // TODO if we have a roster, have a 'cancel' button
-
         if self.has_roster {
             let cancel = button("cancel")
                 .class(ButtonStyle::danger)
@@ -573,7 +567,7 @@ impl<'a> PlayerCreation<'a> {
         let sold = button("sold!")
             .class(ButtonStyle::success)
             .text_horizontal_align(Justification::Center)
-            .disabled_if(self.player.name.trim().is_empty()); // <-- this line
+            .disabled_if(self.player.name.trim().is_empty());
 
         if ui.show(sold).clicked() {
             *self.creation = Creation::Accept
@@ -691,7 +685,7 @@ impl<'a> PlayerCreation<'a> {
 
                     let unroll = button("unroll?")
                         .class(ButtonStyle::danger)
-                        .disabled_if(!self.stats.has_history()); // <-- this line
+                        .disabled_if(!self.stats.has_history());
 
                     if ui.show(unroll).clicked() {
                         self.player.stats = self.stats.unroll()
