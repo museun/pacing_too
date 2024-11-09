@@ -423,7 +423,7 @@ dependencies = [
 [[package]]
 name = "too"
 version = "0.1.0"
-source = "git+https://github.com/museun/too?rev=f0c64810eaa1dfe1b408c05c6f39439ff0efe8e4#f0c64810eaa1dfe1b408c05c6f39439ff0efe8e4"
+source = "git+https://github.com/museun/too?rev=404ec47da8eebcefc3707d06807bb2a3dc3a8858#404ec47da8eebcefc3707d06807bb2a3dc3a8858"
 dependencies = [
  "compact_str",
  "crossterm",

@@ -9,19 +9,10 @@ use std::path::Path;
 
 use too::{
     layout::{Align2, Axis},
-    view::{
-        self,
-        views::{
-            button::{button, ButtonStyle},
-            checkbox::{checkbox, CheckboxStyle},
-            expander::{separator, SeparatorStyle},
-            label::{label, LabelStyle},
-            list::list,
-            progress::{progress, ProgressStyle},
-            text_input::text_input,
-            Constrain, CrossAlign, Justify, List, Progress,
-        },
-        Adhoc, Elements, Palette, Ui,
+    view::{self, Adhoc, Elements, Palette, Ui},
+    views::{
+        button, checkbox, label, list, progress, separator, text_input, ButtonStyle, CheckboxStyle,
+        Constrain, CrossAlign, Justify, LabelStyle, List, Progress, ProgressStyle, SeparatorStyle,
     },
     Border, Justification, Rgba,
 };
