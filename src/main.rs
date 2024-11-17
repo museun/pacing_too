@@ -8,13 +8,14 @@ use core::{
 use std::path::Path;
 
 use too::{
-    layout::{Align2, Axis},
-    view::{self, Adhoc, Elements, Palette, Ui},
+    layout::{Align, Align2, Axis, CrossAlign, Justify},
+    renderer::{Border, Rgba},
+    view::{Adhoc, DebugMode, Elements, Palette, Ui},
     views::{
         button, checkbox, label, list, progress, separator, text_input, ButtonStyle, CheckboxStyle,
-        Constrain, CrossAlign, Justify, LabelStyle, List, Progress, ProgressStyle, SeparatorStyle,
+        Constrain, LabelStyle, List, Progress, ProgressStyle, SeparatorStyle,
     },
-    Border, Justification, Rgba,
+    RunConfig,
 };
 
 mod core;
@@ -114,97 +115,74 @@ impl App {
 impl App {
     fn view(&mut self, ui: &Ui) {
         match &mut self.screen {
-            Screen::PlayerCreation { player, stats } => {
-                let mut creation = Creation::default();
-                PlayerCreation {
-                    player: player.as_mut().unwrap(),
-                    stats,
-                    rng: &mut self.rng,
-                    creation: &mut creation,
-                    has_roster: !self.roster.is_empty(),
-                }
-                .show(ui);
-
-                match creation {
-                    Creation::Accept => {
-                        self.roster.push(player.take().unwrap());
-                        self.screen = Screen::PlayerSelect
-                    }
-
-                    Creation::Cancel => {
-                        let mut selected = Selected::default();
-                        PlayerSelect {
-                            roster: &mut self.roster,
-                            selected: &mut selected,
-                        }
-                        .show(ui);
-
-                        match selected {
-                            Selected::Play { index } => {
-                                self.screen = Screen::Simulation {
-                                    simulation: Simulation::new(self.roster[index].clone()),
-                                }
-                            }
-                            Selected::CreateNew => {
-                                let mut stats = StatsBuilder::default();
-                                self.screen = Screen::PlayerCreation {
-                                    player: Some(Self::rando_player(&mut self.rng, &mut stats)),
-                                    stats,
-                                }
-                            }
-                            Selected::None => {}
-                        }
-                    }
-                    Creation::Nothing => {}
-                }
+            Screen::PlayerCreation { .. } => self.player_creation(ui),
+            Screen::PlayerSelect => self.player_select(ui),
+            Screen::Simulation { simulation } => {
+                simulation.tick(&mut self.rng);
+                Game { simulation }.show(ui);
             }
-            Screen::PlayerSelect if self.roster.is_empty() => {
+        }
+    }
+
+    fn player_creation(&mut self, ui: &Ui) {
+        let Screen::PlayerCreation { player, stats } = &mut self.screen else {
+            return;
+        };
+
+        let mut creation = Creation::default();
+        PlayerCreation {
+            player: player.as_mut().unwrap(),
+            stats,
+            rng: &mut self.rng,
+            creation: &mut creation,
+            has_roster: !self.roster.is_empty(),
+        }
+        .show(ui);
+
+        match creation {
+            Creation::Accept => {
+                self.roster.push(player.take().unwrap());
+                self.screen = Screen::PlayerSelect
+            }
+            Creation::Cancel => self.screen = Screen::PlayerSelect {},
+            Creation::Nothing => {}
+        }
+    }
+
+    fn simulation_index(&mut self, index: usize) {
+        let simulation = Simulation::new(self.roster[index].clone());
+        self.screen = Screen::Simulation { simulation }
+    }
+
+    fn player_select(&mut self, ui: &Ui) {
+        if self.roster.is_empty() {
+            let mut stats = StatsBuilder::default();
+            self.screen = Screen::PlayerCreation {
+                player: Some(Self::rando_player(&mut self.rng, &mut stats)),
+                stats,
+            };
+            return;
+        }
+
+        let mut selected = Selected::default();
+        PlayerSelect {
+            roster: &mut self.roster,
+            selected: &mut selected,
+        }
+        .show(ui);
+
+        match selected {
+            Selected::Play { index } => self.simulation_index(index),
+            Selected::CreateNew => {
                 let mut stats = StatsBuilder::default();
                 self.screen = Screen::PlayerCreation {
                     player: Some(Self::rando_player(&mut self.rng, &mut stats)),
                     stats,
-                }
+                };
             }
-            Screen::PlayerSelect => {
-                let mut selected = Selected::default();
-                PlayerSelect {
-                    roster: &mut self.roster,
-                    selected: &mut selected,
-                }
-                .show(ui);
-
-                match selected {
-                    Selected::Play { index } => {
-                        self.screen = Screen::Simulation {
-                            simulation: Simulation::new(self.roster[index].clone()),
-                        }
-                    }
-                    Selected::CreateNew => {
-                        let mut stats = StatsBuilder::default();
-                        self.screen = Screen::PlayerCreation {
-                            player: Some(Self::rando_player(&mut self.rng, &mut stats)),
-                            stats,
-                        }
-                    }
-                    Selected::None => {}
-                }
-            }
-            Screen::Simulation { simulation } => Self::simulation(simulation, &mut self.rng, ui),
+            Selected::None => {}
         }
     }
-
-    fn simulation(simulation: &mut Simulation, rng: &mut Rand, ui: &Ui) {
-        simulation.tick(rng);
-        Game { simulation }.show(ui);
-    }
-}
-
-fn vertical_fill() -> List {
-    list().vertical().cross_align(CrossAlign::Fill)
-}
-
-fn vertical_stretch() -> List {
-    list().vertical().cross_align(CrossAlign::Stretch)
 }
 
 struct Game<'a> {
@@ -227,7 +205,6 @@ impl<'a> Game<'a> {
                     self.show_quest_log(ui);
                 });
             });
-
             self.show_task_bar(ui);
         });
     }
@@ -238,7 +215,6 @@ impl<'a> Game<'a> {
             if let Some(task) = &self.simulation.player.task {
                 ui.label(&task.description);
             }
-
             ui.show(pacing_bar(&self.simulation.player.task_bar));
         });
     }
@@ -396,19 +372,6 @@ impl<'a> Game<'a> {
     }
 }
 
-fn pacing_bar(bar: &Bar) -> Progress {
-    fn medium_progress(palette: &Palette, axis: Axis) -> ProgressStyle {
-        ProgressStyle {
-            filled: Elements::MEDIUM_RECT,
-            unfilled: Elements::MEDIUM_RECT,
-            ..ProgressStyle::default(palette, axis)
-        }
-    }
-    progress(bar.pos)
-        .range(0.0..=bar.max)
-        .class(medium_progress)
-}
-
 #[derive(Default)]
 enum Selected {
     Play {
@@ -464,12 +427,11 @@ impl<'a> PlayerSelect<'a> {
 
                             ui.horizontal(|ui| {
                                 ui.show(label("Birthday:").faint());
-                                ui.label(
-                                    player
-                                        .birthday
-                                        .format(&time::format_description::well_known::Rfc2822)
-                                        .unwrap(),
-                                )
+                                let birthday = player
+                                    .birthday
+                                    .format(&time::format_description::well_known::Rfc2822)
+                                    .unwrap();
+                                ui.label(birthday)
                             });
 
                             ui.horizontal(|ui| {
@@ -520,7 +482,6 @@ struct PlayerCreation<'a> {
 impl<'a> PlayerCreation<'a> {
     fn show(mut self, ui: &Ui) {
         self.show_meta_controls(ui);
-
         ui.vertical(|ui| {
             self.show_player_roll(ui);
             ui.show(separator().class(SeparatorStyle::thin_dashed));
@@ -549,7 +510,8 @@ impl<'a> PlayerCreation<'a> {
         if self.has_roster {
             let cancel = button("cancel")
                 .class(ButtonStyle::danger)
-                .text_horizontal_align(Justification::CENTER);
+                .text_horizontal_align(Align::CENTER);
+
             if ui.show(cancel).clicked() {
                 *self.creation = Creation::Cancel
             }
@@ -557,7 +519,7 @@ impl<'a> PlayerCreation<'a> {
 
         let sold = button("sold!")
             .class(ButtonStyle::success)
-            .text_horizontal_align(Justification::Center)
+            .text_horizontal_align(Align::CENTER)
             .disabled_if(self.player.name.trim().is_empty());
 
         if ui.show(sold).clicked() {
@@ -598,7 +560,7 @@ impl<'a> PlayerCreation<'a> {
             ui.frame(Border::THICK, "Race", |ui| {
                 ui.vertical(|ui| {
                     for race @ Race { name, .. } in RACES {
-                        ui.adhoc(radio(race, &mut self.player.race, &name));
+                        ui.adhoc(radio(race, &mut self.player.race, name));
                     }
                 });
             });
@@ -610,7 +572,7 @@ impl<'a> PlayerCreation<'a> {
             ui.frame(Border::THICK, "Class", |ui| {
                 ui.vertical(|ui| {
                     for class @ Class { name, .. } in CLASSES {
-                        ui.adhoc(radio(class, &mut self.player.class, &name));
+                        ui.adhoc(radio(class, &mut self.player.class, name));
                     }
                 });
             });
@@ -619,7 +581,7 @@ impl<'a> PlayerCreation<'a> {
 
     fn show_stats_roll(&mut self, ui: &Ui) {
         ui.frame(Border::THICK, "Stats", |ui| {
-            ui.show_children(list().vertical().cross_align(CrossAlign::Stretch), |ui| {
+            ui.show_children(vertical_stretch(), |ui| {
                 ui.vertical(|ui| {
                     for (stat, value) in self.player.stats.iter().take(PRIME_STATS.len()) {
                         ui.show_children(list().horizontal().gap(5), |ui| {
@@ -666,7 +628,7 @@ impl<'a> PlayerCreation<'a> {
                     });
                 });
 
-                ui.expander();
+                ui.expand_axis();
 
                 ui.horizontal(|ui| {
                     let roll = button("roll");
@@ -735,12 +697,37 @@ where
     Radio { item, value, label }
 }
 
+fn pacing_bar(bar: &Bar) -> Progress {
+    fn medium_progress(palette: &Palette, axis: Axis) -> ProgressStyle {
+        ProgressStyle {
+            filled: Elements::MEDIUM_RECT,
+            unfilled: Elements::MEDIUM_RECT,
+            ..ProgressStyle::default(palette, axis)
+        }
+    }
+    progress(bar.pos)
+        .range(0.0..=bar.max)
+        .class(medium_progress)
+}
+
+fn vertical_fill() -> List {
+    list().vertical().cross_align(CrossAlign::Fill)
+}
+
+fn vertical_stretch() -> List {
+    list().vertical().cross_align(CrossAlign::Stretch)
+}
+
 fn main() -> anyhow::Result<()> {
     let mut app = App::load("pacing.json")?;
-    view::application(
-        || Palette {
-            foreground: Rgba::hex("#CCC"),
-            ..Palette::dark()
+    too::application(
+        RunConfig {
+            palette: Palette {
+                foreground: Rgba::hex("#DDD"),
+                ..Palette::dark()
+            },
+            debug: DebugMode::Rolling,
+            ..Default::default()
         },
         |ui| app.view(ui),
     )?;
