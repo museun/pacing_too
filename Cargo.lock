@@ -422,8 +422,9 @@ dependencies = [
 
 [[package]]
 name = "too"
-version = "0.1.0"
-source = "git+https://github.com/museun/too?rev=51f0b166c1522de47d760961d4856e6593c20fc2#51f0b166c1522de47d760961d4856e6593c20fc2"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "038ac9faa9a1909da0ac3a26d54f8cfa0cb823a93cfcf78296408f489a04fc92"
 dependencies = [
  "compact_str",
  "crossterm",
