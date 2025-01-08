@@ -10,4 +10,4 @@ heck = "0.5.0"
 serde = { version = "1.0.214", features = [ "derive" ] }
 serde_json = "1.0.132"
 time = { version = "0.3.36", features = [ "serde", "serde-well-known" ] }
-too = "0.2.0"
+too = { git = "https://github.com/museun/too", rev = "7c4bf29dffefe1ad35df980fca6e922c16385510" }

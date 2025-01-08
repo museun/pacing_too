@@ -10,10 +10,11 @@ use std::path::Path;
 use too::{
     layout::{Align, Align2, Axis, CrossAlign, Justify},
     renderer::{Border, Rgba},
-    view::{Adhoc, DebugMode, Elements, Palette, Ui},
+    view::{DebugMode, Elements, Palette, Style as _, StyleOptions, Ui, ViewExt as _},
     views::{
-        button, checkbox, label, list, progress, separator, text_input, ButtonStyle, CheckboxStyle,
-        Constrain, LabelStyle, List, Progress, ProgressStyle, SeparatorStyle,
+        button, checkbox, label, list, progress, radio, separator, text_input, ButtonStyle,
+        CheckboxStyle, Constrain, LabelStyle, List, Progress, ProgressStyle, RadioStyle,
+        SeparatorStyle,
     },
     RunConfig,
 };
@@ -327,17 +328,7 @@ impl<'a> Game<'a> {
             ui.show_children(vertical_fill().scrollable(true), |ui| {
                 let map_act = |act| (act < current, act_name(act));
                 for (mut completed, name) in (0..=quest_book.act()).map(map_act) {
-                    let done = completed;
-                    ui.adhoc(checkbox(&mut completed, &name).style(CheckboxStyle {
-                        checked: "🗹",
-                        unchecked: "☐",
-                        text_color: if done {
-                            ui.palette().outline
-                        } else {
-                            ui.palette().foreground
-                        },
-                        hovered_color: None,
-                    }));
+                    ui.show(checkbox(&mut completed, &name).class(pacing_check_box));
                 }
             });
             ui.show_children(vertical_stretch(), |ui| {
@@ -351,17 +342,7 @@ impl<'a> Game<'a> {
                         .map(|q| (true, q))
                         .chain(quest_book.current_quest().map(|q| (false, q)))
                     {
-                        let done = completed;
-                        ui.adhoc(checkbox(&mut completed, name).style(CheckboxStyle {
-                            checked: "🗹",
-                            unchecked: "☐",
-                            text_color: if done {
-                                ui.palette().outline
-                            } else {
-                                ui.palette().foreground
-                            },
-                            hovered_color: None,
-                        }));
+                        ui.show(checkbox(&mut completed, &name).class(pacing_check_box));
                     }
                 });
             });
@@ -560,7 +541,10 @@ impl<'a> PlayerCreation<'a> {
             ui.frame(Border::THICK, "Race", |ui| {
                 ui.vertical(|ui| {
                     for race @ Race { name, .. } in RACES {
-                        ui.adhoc(radio(race, &mut self.player.race, name));
+                        ui.show(
+                            radio(race.clone(), &mut self.player.race, name)
+                                .class(pacing_radio_class),
+                        );
                     }
                 });
             });
@@ -572,7 +556,10 @@ impl<'a> PlayerCreation<'a> {
             ui.frame(Border::THICK, "Class", |ui| {
                 ui.vertical(|ui| {
                     for class @ Class { name, .. } in CLASSES {
-                        ui.adhoc(radio(class, &mut self.player.class, name));
+                        ui.show(
+                            radio(class.clone(), &mut self.player.class, name)
+                                .class(pacing_radio_class),
+                        );
                     }
                 });
             });
@@ -649,56 +636,37 @@ impl<'a> PlayerCreation<'a> {
     }
 }
 
-struct Radio<'a, V> {
-    item: &'a V,
-    value: &'a mut V,
-    label: &'a str,
-}
-
-impl<'v, V> Adhoc<'v> for Radio<'v, V>
-where
-    V: PartialEq + Clone,
-{
-    type Output = ();
-    fn show(self, ui: &Ui) -> Self::Output {
-        let resp = ui.mouse_area(|ui| {
-            ui.horizontal(|ui| {
-                let checked = if *self.item == *self.value {
-                    '🟢'
-                } else if ui.palette().is_dark() {
-                    '⚫'
-                } else {
-                    '⚪'
-                };
-                ui.label(checked);
-
-                let foreground = if ui.is_parent_hovered() {
-                    ui.palette().contrast
-                } else if *self.item == *self.value {
-                    ui.palette().foreground
-                } else {
-                    ui.palette().outline
-                };
-
-                ui.show(label(self.label).style(LabelStyle { foreground }))
-            });
-        });
-
-        if resp.flatten_left().clicked() {
-            *self.value = self.item.clone();
-        }
+fn pacing_check_box(palette: &Palette, options: StyleOptions<bool>) -> CheckboxStyle {
+    CheckboxStyle {
+        text_color: if *options {
+            palette.outline
+        } else {
+            palette.foreground
+        },
+        hovered_color: None,
+        ..CheckboxStyle::ascii(palette, options)
     }
 }
 
-fn radio<'a, V>(item: &'a V, value: &'a mut V, label: &'a str) -> Radio<'a, V>
-where
-    V: PartialEq + Clone,
-{
-    Radio { item, value, label }
+fn pacing_radio_class(palette: &Palette, selected: StyleOptions<bool>) -> RadioStyle {
+    // RadioStyle::default(palette, selected)
+    RadioStyle {
+        selected: Some("🟢"),
+        unselected: Some(if palette.is_dark() { "⚫" } else { "⚪" }),
+        text_color: if *selected {
+            palette.foreground
+        } else {
+            palette.outline
+        },
+        background: palette.background,
+        selected_background: palette.background,
+        hovered_text: Some(palette.contrast),
+        hovered_background: None,
+    }
 }
 
 fn pacing_bar(bar: &Bar) -> Progress {
-    fn medium_progress(palette: &Palette, axis: Axis) -> ProgressStyle {
+    fn medium_progress(palette: &Palette, axis: StyleOptions<Axis>) -> ProgressStyle {
         ProgressStyle {
             filled: Elements::MEDIUM_RECT,
             unfilled: Elements::MEDIUM_RECT,
@@ -726,7 +694,8 @@ fn main() -> anyhow::Result<()> {
                 foreground: Rgba::hex("#DDD"),
                 ..Palette::dark()
             },
-            debug: DebugMode::Rolling,
+            debug: DebugMode::PerFrame,
+            // debug_anchor: Anchor2::LEFT_TOP,
             ..Default::default()
         },
         |ui| app.view(ui),
